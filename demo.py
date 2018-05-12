@@ -1,5 +1,5 @@
 '''
-Demo of 2D calculation of center of bouyancy
+Demo of 2D calculation of rotational stability
 '''
 
 import numpy as np
@@ -14,33 +14,33 @@ halfbeam = beam * 0.5
 
 sectionX = np.array([
     -1 * halfbeam,
-    -0.2 * halfbeam,
+    -0.5 * halfbeam,
     0.0,
-    0.2 * halfbeam,
+    0.5 * halfbeam,
     1 * halfbeam])
 sectionY = np.array([
     0.0,
-    -0.75 * depth,
+    -0.5 * depth,
     -1.0 * depth,
-    -0.75 * depth,
+    -0.5 * depth,
     0.0])
 
 section = np.vstack([sectionX, sectionY])
 
-# Center of mass is center of mass equation for full section (right now)
-com_x = 0
+def com(x, y):
+    A = integrate.cumtrapz(x=x, y=-y)[-1]
+    
+    g_x = y
+    inner = np.multiply(x, -g_x)
+    com_x = integrate.cumtrapz(x=x, y=inner)[-1] / A
 
-x = section[0,:].flatten()
-y = section[1,:].flatten()
-A = integrate.cumtrapz(x=x, y=-y)[-1]
-y2 = np.square(y)
-com_y = integrate.cumtrapz(x=x, y=-y2)[-1] / (2 * A)
+    y2 = np.square(y)
+    com_y = integrate.cumtrapz(x=x, y=-y2)[-1] / (2 * A)
+    com = np.array([com_x, com_y])
+    com = np.round(com, 8)
+    return com
 
-1/0
-
-boat_rotation = pi/8
-br = boat_rotation
-water_level = 0.0
+sec_com = com(sectionX, sectionY)
 
 waterX = np.linspace(-halfbeam, halfbeam, 100)
 waterY = np.zeros(waterX.shape)
@@ -52,15 +52,17 @@ supported_liters = supported_mass / 1000
 saved_sections = []
 center_vectors = []
 
-for boat_rotation in np.linspace(-0.5, 0.5, 9):
+for boat_rotation in np.linspace(-pi/4, 0.5, 9):
     br = boat_rotation
     boat_R = np.matrix([[cos(br), -sin(br)], [sin(br), cos(br)]])
+    rotated_com = boat_R * np.matrix(sec_com).T
     rotated_section = np.array(boat_R * np.matrix(section))
     
     water_level = 0.0
 
     # test
     for i in range(0, 5):
+        break
         original_displace = integrate.cumtrapz(
             y=rotated_section[1].flatten(),
             x=rotated_section[0].flatten()) # ~= -2 m^3
@@ -76,7 +78,18 @@ for boat_rotation in np.linspace(-0.5, 0.5, 9):
         # 1 L of water -> 1 kg -> 9.81 m/s -> 9.81 N
         # J24 -> 1406 kg, 3100 lb
         # 1 lbf ->  4.4482 N
-    
+
+    submerged_section = rotated_section.copy()
+    rot_com = com(submerged_section[0,:], submerged_section[1,:])
+    print('compare at %.2f' % (br,))
+    print(rotated_com)
+    print('vs')
+    print(rot_com)
+    submerged_section[1,:] = np.clip(submerged_section[1,:], None, 0)
+
+    rot_cob = com(submerged_section[0,:], submerged_section[1,:])
+    # print(rot_cob)
+
     center_idx = len(rotated_section[0].flatten()) // 2
 
 
@@ -95,6 +108,7 @@ for boat_rotation in np.linspace(-0.5, 0.5, 9):
     ax.set_aspect(1.0)
     plt.tight_layout()
     plt.show()
+    1/0
 
 for cv in center_vectors:
     plt.plot(*cv)
