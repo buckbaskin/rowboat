@@ -12,25 +12,55 @@ depth = 1.0 # from deck
 beam = 2.71
 halfbeam = beam * 0.5
 mass = 1406
+freeboard = 0.9 # m
+draft = 1.22 # m
 keel_mass = 431 # kg
-keel_depth = 1.22 # m
-keel_com = -keel_depth / 2 # (fin keel, no division for bulb keel)
+keel_depth = freeboard + draft # m
+keel_com = -(depth + (keel_depth - depth) / 2) # (fin keel, no division for bulb keel)
 hull_mass = mass - keel_mass
 supported_mass = hull_mass / length
 supported_liters = supported_mass / 1000
 
+wind_velocity = 10 # mph
+wind_velocity = wind_velocity * 0.447 # m / sec
+wind_density = 1.225 # kg / m^3
+sail_area_100p = 24.26 # m^2
+mast_height = 10 # m (approx)
+mast_lever = mast_height / 3
+
+# wind_knock = 
+
 sectionX = np.array([
     -1 * halfbeam,
+    -0.95 * halfbeam,
     -0.8 * halfbeam,
+    -0.15 * halfbeam,
     0.0,
+    0.15 * halfbeam,
     0.8 * halfbeam,
+    0.95 * halfbeam,
     1 * halfbeam])
 sectionY = np.array([
     0.0,
-    -0.5 * depth,
+    -0.4 * depth,
+    -0.55 * depth,
+    -0.85 * depth,
     -1.0 * depth,
-    -0.5 * depth,
+    -0.85* depth,
+    -0.55 * depth,
+    -0.4 * depth,
     0.0])
+
+visualize_section = False
+if visualize_section:
+    fig = plt.figure()
+    ax = fig.add_subplot('111')
+    ax.plot(sectionX, sectionY)
+    ax.plot([0, 0, 0], [0, keel_com, -keel_depth], marker='x')
+    ax.set_aspect(1.0)
+    plt.show()
+    import sys
+    sys.exit(0)
 
 section = np.vstack([sectionX, sectionY])
 
@@ -63,10 +93,10 @@ resolution = 101
 max_deg = 30
 max_rad = max_deg / 180 * pi
 
+unstable_design = False
+
 for boat_rotation in np.linspace(-max_rad, max_rad, resolution):
     br = boat_rotation
-    if abs(br) < 0.01:
-        print(br)
     boat_R = np.matrix([[cos(br), -sin(br)], [sin(br), cos(br)]])
     rotated_com = boat_R * np.matrix(boat_com).T
     rotated_section = np.array(boat_R * np.matrix(section))
@@ -97,21 +127,22 @@ for boat_rotation in np.linspace(-max_rad, max_rad, resolution):
 
     rot_cob = com(submerged_section[0,:], submerged_section[1,:])
 
-    righting_moment = np.matrix(rot_cob).T - rotated_com
-    polarX.append(br)
-    righting_lever = float(righting_moment[0])
-    if abs(br) > 0.001:
-        righting_lever *= (-br / abs(br))
-    polarY.append(righting_lever)
+    righting_lever = np.matrix(rot_cob).T - rotated_com
+    polarX.append(br * (180 / pi)) # degrees
+    righting_moment = float(righting_lever[0]) * (mass * 9.81) # Newton meters
+    if abs(br) > 0.00001:
+        righting_moment *= (-br / abs(br))
+    righting_torque = righting_moment / 1.3556 # ft-lb
+    polarY.append(righting_torque)
 
     rcomx, rcomy = rotated_com
     rcobx, rcoby = rot_cob
 
-    if resolution <= 7 or righting_lever < 0:
+    if resolution <= 7 or (righting_moment < 0 and unstable_design == False):
         fig = plt.figure()
         ax = fig.add_subplot('111')
         title = 'Ship Display (%.1f deg)' % (br * 180 / pi,)
-        if righting_lever < 0:
+        if righting_moment < 0:
             title += ' Unstable'
         ax.set_title(title)
         ax.plot(waterX, waterY)
@@ -126,9 +157,14 @@ for boat_rotation in np.linspace(-max_rad, max_rad, resolution):
         ax.set_aspect(1.0)
         plt.tight_layout()
         plt.show()
+    if righting_moment <= 0:
+        if br > 0 or br < 0:
+           unstable_design = True
 
 fig = plt.figure()
 ax = fig.add_subplot('111')
 ax.plot(polarX, polarY)
 ax.set_title('Stability Curve')
 plt.show()
+
+print('Stable Design? %s' % (not unstable_design,))
