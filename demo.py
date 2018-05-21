@@ -1,5 +1,27 @@
 '''
 Demo of 2D calculation of rotational stability
+
+Steps:
+
+Build section
+    Add hull properties
+Visualize section
+Calculate COM (should rotate with hull because all rigid)
+build wave profile
+
+rotate
+find submerged level
+find displaced COM
+find lever arm
+
+Visualize rotation profile
+
+Quantify rotational stability compared to wind resistance
+    Quantify sail area and lever arm
+    Pick wind speed -> knocking force
+    compare to righting force
+
+Bless sailboat as stable or not yet
 '''
 
 import numpy as np
